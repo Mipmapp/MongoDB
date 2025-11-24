@@ -65,6 +65,7 @@ const Course = mongoose.model('Course', courseSchema);
 // ROUTES
 // ===============================
 
+// Mangita ug students
 // --- STUDENTS ---
 app.get('/students', async (req, res) => {
     try {
@@ -75,18 +76,58 @@ app.get('/students', async (req, res) => {
     }
 });
 
+// Diri e register ang student
+// POST new student
 app.post('/students', async (req, res) => {
+    const {
+        student_id,
+        rfid_code,
+        first_name,
+        middle_name,
+        last_name,
+        year_level,
+        suffix,
+        course,
+        program,
+        created_by,
+        photo // optional
+    } = req.body;
+
+    // Validate required fields
+    if (!student_id || !rfid_code || !last_name || !first_name || !year_level || !course || !program || !created_by) {
+        return res.status(400).json({ message: "Please fill in all required fields." });
+    }
+
     try {
-        const student = await Student.create(req.body);
-        res.status(201).json(student);
+        // Create student
+        const full_name = first_name + (middle_name ? ' ' + middle_name + ' ' : ' ') + last_name + (suffix ? suffix : '');
+        const student = new Student({
+            student_id,
+            rfid_code,
+            full_name,
+            first_name,
+            middle_name,
+            last_name,
+            suffix,
+            year_level,
+            course,
+            program,
+            created_by,
+            photo
+        });
+
+        const newStudent = await student.save();
+        res.status(201).json(newStudent);
     } catch (err) {
         if (err.code === 11000) {
-            return res.status(400).json({ message: "Duplicate student_id or rfid_code." });
+            // Handle duplicate student_id or rfid_code
+            return res.status(400).json({ message: "Student ID or RFID code already registered." });
         }
         res.status(400).json({ message: err.message });
     }
 });
 
+// Diri editon and student data
 app.put('/students/:id', async (req, res) => {
     try {
         const updated = await Student.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
@@ -100,6 +141,7 @@ app.put('/students/:id', async (req, res) => {
     }
 });
 
+// Diri idelete ang student
 app.delete('/students/:id', async (req, res) => {
     try {
         const deleted = await Student.findByIdAndDelete(req.params.id);
@@ -110,6 +152,11 @@ app.delete('/students/:id', async (req, res) => {
     }
 });
 
+// =============================== //
+//  DIRI SATA KUTOB SA REGISTER   //
+// ============================== //
+
+// Diri e manage ang users
 // --- USERS ---
 app.get('/users', async (req, res) => {
     try {
@@ -154,7 +201,7 @@ app.delete('/users/:id', async (req, res) => {
 });
 
 // --- PROGRAMS ---
-app.get('/programs', async (req, res) => {
+app.get('/api/programs', async (req, res) => {
     try {
         const programs = await Program.find();
         res.json(programs);
@@ -163,7 +210,7 @@ app.get('/programs', async (req, res) => {
     }
 });
 
-app.post('/programs', async (req, res) => {
+app.post('/api/programs', async (req, res) => {
     try {
         const program = await Program.create(req.body);
         res.status(201).json(program);
@@ -173,7 +220,7 @@ app.post('/programs', async (req, res) => {
     }
 });
 
-app.put('/programs/:id', async (req, res) => {
+app.put('/api/programs/:id', async (req, res) => {
     try {
         const updated = await Program.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
         if (!updated) return res.status(404).json({ message: "Program not found." });
@@ -184,7 +231,7 @@ app.put('/programs/:id', async (req, res) => {
     }
 });
 
-app.delete('/programs/:id', async (req, res) => {
+app.delete('/api/programs/:id', async (req, res) => {
     try {
         const deleted = await Program.findByIdAndDelete(req.params.id);
         if (!deleted) return res.status(404).json({ message: "Program not found." });
