@@ -5,7 +5,7 @@ import dotenv from 'dotenv';
 const app = express();
 dotenv.config();
 
-const PORT = process.env.PORT || 5000;
+const PORT = 8000;
 
 const MONGO_URI = `mongodb+srv://SSAAMReg:uFLm2a3PHfpmUEUC@cluster0.bnwy9iy.mongodb.net/dbconnect?retryWrites=true&w=majority`
 
@@ -21,6 +21,10 @@ mongoose.connect(MONGO_URI, {
 .catch((err) => console.error('MongoDB connection error:', err));
 
 app.use(express.json());
+
+app.get('/', (req, res) => {
+    res.send('SSAAM Registration System API is running');
+});
 
 // ===============================
 // MODELS
@@ -155,129 +159,3 @@ app.delete('/students/:id', async (req, res) => {
 // =============================== //
 //  DIRI SATA KUTOB SA REGISTER   //
 // ============================== //
-
-// Diri e manage ang users
-// --- USERS ---
-app.get('/users', async (req, res) => {
-    try {
-        const users = await User.find();
-        res.json(users);
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
-});
-
-app.post('/users', async (req, res) => {
-    try {
-        const user = await User.create(req.body);
-        res.status(201).json(user);
-    } catch (err) {
-        if (err.code === 11000) {
-            return res.status(400).json({ message: "Duplicate rfid_code." });
-        }
-        res.status(400).json({ message: err.message });
-    }
-});
-
-app.put('/users/:id', async (req, res) => {
-    try {
-        const updated = await User.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
-        if (!updated) return res.status(404).json({ message: "User not found." });
-        res.json(updated);
-    } catch (err) {
-        if (err.code === 11000) return res.status(400).json({ message: "Duplicate rfid_code." });
-        res.status(400).json({ message: err.message });
-    }
-});
-
-app.delete('/users/:id', async (req, res) => {
-    try {
-        const deleted = await User.findByIdAndDelete(req.params.id);
-        if (!deleted) return res.status(404).json({ message: "User not found." });
-        res.json({ message: "User deleted successfully." });
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
-});
-
-// --- PROGRAMS ---
-app.get('/api/programs', async (req, res) => {
-    try {
-        const programs = await Program.find();
-        res.json(programs);
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
-});
-
-app.post('/api/programs', async (req, res) => {
-    try {
-        const program = await Program.create(req.body);
-        res.status(201).json(program);
-    } catch (err) {
-        if (err.code === 11000) return res.status(400).json({ message: "Duplicate program_code." });
-        res.status(400).json({ message: err.message });
-    }
-});
-
-app.put('/api/programs/:id', async (req, res) => {
-    try {
-        const updated = await Program.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
-        if (!updated) return res.status(404).json({ message: "Program not found." });
-        res.json(updated);
-    } catch (err) {
-        if (err.code === 11000) return res.status(400).json({ message: "Duplicate program_code." });
-        res.status(400).json({ message: err.message });
-    }
-});
-
-app.delete('/api/programs/:id', async (req, res) => {
-    try {
-        const deleted = await Program.findByIdAndDelete(req.params.id);
-        if (!deleted) return res.status(404).json({ message: "Program not found." });
-        res.json({ message: "Program deleted successfully." });
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
-});
-
-// --- COURSES ---
-app.get('/courses', async (req, res) => {
-    try {
-        const courses = await Course.find();
-        res.json(courses);
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
-});
-
-app.post('/courses', async (req, res) => {
-    try {
-        const course = await Course.create(req.body);
-        res.status(201).json(course);
-    } catch (err) {
-        if (err.code === 11000) return res.status(400).json({ message: "Duplicate course_code." });
-        res.status(400).json({ message: err.message });
-    }
-});
-
-app.put('/courses/:id', async (req, res) => {
-    try {
-        const updated = await Course.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
-        if (!updated) return res.status(404).json({ message: "Course not found." });
-        res.json(updated);
-    } catch (err) {
-        if (err.code === 11000) return res.status(400).json({ message: "Duplicate course_code." });
-        res.status(400).json({ message: err.message });
-    }
-});
-
-app.delete('/courses/:id', async (req, res) => {
-    try {
-        const deleted = await Course.findByIdAndDelete(req.params.id);
-        if (!deleted) return res.status(404).json({ message: "Course not found." });
-        res.json({ message: "Course deleted successfully." });
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
-});
