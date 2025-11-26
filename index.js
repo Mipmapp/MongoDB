@@ -12,13 +12,13 @@ const MONGO_URI = `mongodb+srv://SSAAMReg:uFLm2a3PHfpmUEUC@cluster0.bnwy9iy.mong
 mongoose.connect(MONGO_URI, {
     serverSelectionTimeoutMS: 5000
 })
-.then(() => {
-    console.log('Connected to MongoDB Atlas');
-    app.listen(PORT, () => {
-        console.log(`Server running at http://localhost:${PORT}`);
-    });
-})
-.catch((err) => console.error('MongoDB connection error:', err));
+    .then(() => {
+        console.log('Connected to MongoDB Atlas');
+        app.listen(PORT, () => {
+            console.log(`Server running at http://localhost:${PORT}`);
+        });
+    })
+    .catch((err) => console.error('MongoDB connection error:', err));
 
 app.use(express.json());
 
@@ -33,7 +33,11 @@ app.get('/', (req, res) => {
 const studentSchema = new mongoose.Schema({
     student_id: { type: String, required: true, unique: true },
     rfid_code: { type: String, required: true, unique: true },
-    fullname: { type: String, required: true },
+    full_name: { type: String, required: true },
+    first_name: { type: String, required: true },
+    middle_name: { type: String },
+    last_name: { type: String, required: true },
+    suffix: { type: String },
     year_level: { type: String, required: true },
     course: { type: String, required: true },
     program: { type: String, required: true },
@@ -42,28 +46,8 @@ const studentSchema = new mongoose.Schema({
     created_date: { type: Date, default: Date.now }
 });
 
+
 const Student = mongoose.model('Student', studentSchema);
-
-const userSchema = new mongoose.Schema({
-    rfid_code: { type: String, required: true, unique: true },
-    user_type: { type: String, enum: ['admin', 'student', 'medpub'], required: true }
-});
-
-const User = mongoose.model('User', userSchema);
-
-const programSchema = new mongoose.Schema({
-    program_code: { type: String, required: true, unique: true },
-    description: { type: String, required: true }
-});
-
-const Program = mongoose.model('Program', programSchema);
-
-const courseSchema = new mongoose.Schema({
-    course_code: { type: String, required: true, unique: true },
-    description: { type: String, required: true }
-});
-
-const Course = mongoose.model('Course', courseSchema);
 
 // ===============================
 // ROUTES
@@ -104,7 +88,7 @@ app.post('/students', async (req, res) => {
 
     try {
         // Create student
-        const full_name = first_name + (middle_name ? ' ' + middle_name + ' ' : ' ') + last_name + (suffix ? suffix : '');
+        const full_name = first_name + (middle_name ? ' ' + middle_name + ' ' : ' ') + last_name + (suffix ? ` ${suffix}` : '');
         const student = new Student({
             student_id,
             rfid_code,
