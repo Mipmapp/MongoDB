@@ -1,34 +1,38 @@
 import express from 'express';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
+import cors from 'cors'; // ✅ Import cors
 
 const app = express();
 dotenv.config();
 
-const PORT = process.env.PORT || 5000;
+// Enable CORS so frontend on localhost can call this API
+app.use(cors()); // ✅ Allow all origins by default
 
+// Parse JSON
+app.use(express.json());
+
+// Use environment variables for PORT and MongoDB URI
+const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI;
+
 mongoose.connect(MONGO_URI, {
     serverSelectionTimeoutMS: 5000
 })
-    .then(() => {
-        console.log('Connected to MongoDB Atlas');
-        app.listen(PORT, () => {
-            console.log(`Server running at http://localhost:${PORT}`);
-        });
-    })
-    .catch((err) => console.error('MongoDB connection error:', err));
+.then(() => {
+    console.log('Connected to MongoDB Atlas');
+    app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
+    });
+})
+.catch((err) => console.error('MongoDB connection error:', err));
 
-app.use(express.json());
-
+// ===== Routes =====
 app.get('/', (req, res) => {
     res.send('SSAAM Registration System API is running');
 });
 
-// ===============================
-// MODELS
-// ===============================
-
+// ===== Student Model =====
 const studentSchema = new mongoose.Schema({
     student_id: { type: String, required: true, unique: true },
     rfid_code: { type: String, required: true, unique: true },
@@ -44,15 +48,9 @@ const studentSchema = new mongoose.Schema({
     created_date: { type: Date, default: Date.now }
 });
 
-
 const Student = mongoose.model('Student', studentSchema);
 
-// ===============================
-// ROUTES
-// ===============================
-
-// Mangita ug students
-// --- STUDENTS ---
+// ===== Student Routes =====
 app.get('/students', async (req, res) => {
     try {
         const students = await Student.find();
@@ -62,8 +60,6 @@ app.get('/students', async (req, res) => {
     }
 });
 
-// Diri e register ang student
-// POST new student
 app.post('/students', async (req, res) => {
     const {
         student_id,
@@ -74,17 +70,15 @@ app.post('/students', async (req, res) => {
         year_level,
         suffix,
         program,
-        photo, // optional
+        photo,
         semester
     } = req.body;
 
-    // Validate required fields
     if (!student_id || !semester || !rfid_code || !last_name || !first_name || !year_level || !program) {
         return res.status(400).json({ message: "Please fill in all required fields." });
     }
 
     try {
-        // Create student
         const full_name = first_name + (middle_name ? ' ' + middle_name + ' ' : ' ') + last_name + (suffix ? ` ${suffix}` : '');
         const student = new Student({
             student_id,
@@ -104,14 +98,12 @@ app.post('/students', async (req, res) => {
         res.status(201).json(newStudent);
     } catch (err) {
         if (err.code === 11000) {
-            // Handle duplicate student_id or rfid_code
             return res.status(400).json({ message: "Student ID or RFID code already registered." });
         }
         res.status(400).json({ message: err.message });
     }
 });
 
-// Diri editon and student data
 app.put('/students/:id', async (req, res) => {
     try {
         const updated = await Student.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
@@ -125,7 +117,6 @@ app.put('/students/:id', async (req, res) => {
     }
 });
 
-// Diri idelete ang student
 app.delete('/students/:id', async (req, res) => {
     try {
         const deleted = await Student.findByIdAndDelete(req.params.id);
@@ -135,7 +126,3 @@ app.delete('/students/:id', async (req, res) => {
         res.status(500).json({ message: err.message });
     }
 });
-
-// =============================== //
-//  DIRI SATA KUTOB SA REGISTER   //
-// ============================== //
