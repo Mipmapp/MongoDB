@@ -5,10 +5,9 @@ import dotenv from 'dotenv';
 const app = express();
 dotenv.config();
 
-const PORT = 8000;
+const PORT = process.env.PORT || 5000;
 
-const MONGO_URI = `mongodb+srv://SSAAMReg:uFLm2a3PHfpmUEUC@cluster0.bnwy9iy.mongodb.net/dbconnect?retryWrites=true&w=majority`
-
+const MONGO_URI = process.env.MONGO_URI;
 mongoose.connect(MONGO_URI, {
     serverSelectionTimeoutMS: 5000
 })
