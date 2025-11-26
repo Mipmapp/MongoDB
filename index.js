@@ -38,10 +38,9 @@ const studentSchema = new mongoose.Schema({
     last_name: { type: String, required: true },
     suffix: { type: String },
     year_level: { type: String, required: true },
-    course: { type: String, required: true },
     program: { type: String, required: true },
     photo: { type: String },
-    created_by: { type: String, required: true },
+    semester: { type: String, required: true },
     created_date: { type: Date, default: Date.now }
 });
 
@@ -74,14 +73,13 @@ app.post('/students', async (req, res) => {
         last_name,
         year_level,
         suffix,
-        course,
         program,
-        created_by,
-        photo // optional
+        photo, // optional
+        semester
     } = req.body;
 
     // Validate required fields
-    if (!student_id || !rfid_code || !last_name || !first_name || !year_level || !course || !program || !created_by) {
+    if (!student_id || !semester || !rfid_code || !last_name || !first_name || !year_level || !program) {
         return res.status(400).json({ message: "Please fill in all required fields." });
     }
 
@@ -95,12 +93,11 @@ app.post('/students', async (req, res) => {
             first_name,
             middle_name,
             last_name,
-            suffix,
             year_level,
-            course,
+            suffix,
             program,
-            created_by,
-            photo
+            photo,
+            semester
         });
 
         const newStudent = await student.save();
