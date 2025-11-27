@@ -46,7 +46,7 @@ const studentSchema = new mongoose.Schema({
     program: { type: String, required: true },
     photo: { type: String },
     semester: { type: String, required: true },
-    email: { type: String.apply, required: true },
+    email: { type: String, required: true },
     created_date: { type: Date, default: Date.now }
 });
 
