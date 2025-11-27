@@ -42,9 +42,11 @@ const studentSchema = new mongoose.Schema({
     last_name: { type: String, required: true },
     suffix: { type: String },
     year_level: { type: String, required: true },
+    school_year: { type: String, required: true },
     program: { type: String, required: true },
     photo: { type: String },
     semester: { type: String, required: true },
+    email: { type: String.apply, required: true },
     created_date: { type: Date, default: Date.now }
 });
 
@@ -68,13 +70,15 @@ app.post('/students', async (req, res) => {
         middle_name,
         last_name,
         year_level,
+        school_year,
         suffix,
         program,
         photo,
-        semester
+        semester,
+        email
     } = req.body;
 
-    if (!student_id || !semester || !rfid_code || !last_name || !first_name || !year_level || !program) {
+    if (!student_id || !semester || !rfid_code || !last_name || !first_name || !year_level || !school_year || !program) {
         return res.status(400).json({ message: "Please fill in all required fields." });
     }
 
@@ -88,10 +92,12 @@ app.post('/students', async (req, res) => {
             middle_name,
             last_name,
             year_level,
+            school_year,
             suffix,
             program,
             photo,
-            semester
+            semester,
+            email
         });
 
         const newStudent = await student.save();
@@ -106,7 +112,7 @@ app.post('/students', async (req, res) => {
 
 app.put('/students/:id', async (req, res) => {
     try {
-        const updated = await Student.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+        const updated = await Student.findByIdAndUpdate(req.params.rfid_code, req.body, { new: true, runValidators: true });
         if (!updated) return res.status(404).json({ message: "Student not found." });
         res.json(updated);
     } catch (err) {
@@ -119,7 +125,7 @@ app.put('/students/:id', async (req, res) => {
 
 app.delete('/students/:id', async (req, res) => {
     try {
-        const deleted = await Student.findByIdAndDelete(req.params.id);
+        const deleted = await Student.findByIdAndDelete(req.params.rfid_code);
         if (!deleted) return res.status(404).json({ message: "Student not found." });
         res.json({ message: "Student deleted successfully." });
     } catch (err) {
