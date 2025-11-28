@@ -107,11 +107,13 @@ app.post('/apis/students', async (req, res) => {
     }
 });
 
-
 // PUT update student
 app.put('/apis/students/:student_id', async (req, res) => {
     try {
         const updates = { ...req.body };
+
+        // Prevent student_id update
+        delete updates.student_id;
 
         // Trim name fields
         updates.first_name = updates.first_name?.trim();
@@ -124,10 +126,6 @@ app.put('/apis/students/:student_id', async (req, res) => {
             return res.status(400).json({ message: "Invalid first_name" });
         if (updates.last_name && !NAME_REGEX.test(updates.last_name))
             return res.status(400).json({ message: "Invalid last_name" });
-
-        // Validate student ID format
-        if (updates.student_id && !STUDENT_ID_REGEX.test(updates.student_id))
-            return res.status(400).json({ message: "Invalid student_id format. Use 12-A-12345" });
 
         // Auto-update full_name
         if (updates.first_name || updates.middle_name || updates.last_name || updates.suffix) {
@@ -155,7 +153,6 @@ app.put('/apis/students/:student_id', async (req, res) => {
         res.status(400).json({ message: err.message });
     }
 });
-
 
 // DELETE student
 app.delete('/apis/students/:student_id', async (req, res) => {
