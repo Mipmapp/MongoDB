@@ -1,59 +1,76 @@
 import express from 'express';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
-import cors from 'cors'; // ✅ Import cors
+import cors from 'cors';
 
 const app = express();
 dotenv.config();
 
-// Enable CORS so frontend on localhost can call this API
-app.use(cors()); // ✅ Allow all origins by default
-
-// Parse JSON
+app.use(cors());
 app.use(express.json());
 
-// Use environment variables for PORT and MongoDB URI
 const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI;
 
-mongoose.connect(MONGO_URI, {
-    serverSelectionTimeoutMS: 5000
-})
+mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 5000 })
 .then(() => {
     console.log('Connected to MongoDB Atlas');
-    app.listen(PORT, () => {
-        console.log(`Server running on port ${PORT}`);
-    });
+    app.listen(PORT, () => console.log(`Server running on ${PORT}`));
 })
-.catch((err) => console.error('MongoDB connection error:', err));
+.catch(err => console.error('MongoDB error:', err));
 
-// ===== Routes =====
-app.get('/', (req, res) => {
-    res.send('SSAAM Registration System API is running');
-});
 
-// ===== Student Model =====
+// ========= VALIDATION REGEX =========
+
+// Student ID format: 12-A-12345
+const STUDENT_ID_REGEX = /^[0-9]{2}-[A-Z]-[0-9]{5}$/;
+
+// Names must contain letters + spaces only
+const NAME_REGEX = /^[A-Za-z ]+$/;
+
+
+// ========= Student Schema =========
 const studentSchema = new mongoose.Schema({
-    student_id: { type: String, required: true, unique: true },
+    student_id: { 
+        type: String, 
+        required: true, 
+        unique: true,
+        match: [STUDENT_ID_REGEX, "Invalid student_id format. Required: 12-A-12345"]
+    },
     rfid_code: { type: String, required: true, unique: true },
-    full_name: { type: String, required: true },
-    first_name: { type: String, required: true },
-    middle_name: { type: String },
-    last_name: { type: String, required: true },
+    full_name: { type: String },
+    first_name: { 
+        type: String, 
+        required: true,
+        match: [NAME_REGEX, "First name must contain letters only"] 
+    },
+    middle_name: { 
+        type: String,
+        match: [NAME_REGEX, "Middle name must contain letters only"],
+        default: ""
+    },
+    last_name: { 
+        type: String, 
+        required: true,
+        match: [NAME_REGEX, "Last name must contain letters only"] 
+    },
     suffix: { type: String },
     year_level: { type: String, required: true },
     school_year: { type: String, required: true },
     program: { type: String, required: true },
     photo: { type: String },
     semester: { type: String, required: true },
-    email: { type: String, required: true },
+    email: { type: String },
     created_date: { type: Date, default: Date.now }
 });
 
-const Student = mongoose.model('Student', studentSchema);
+const Student = mongoose.model("Student", studentSchema);
 
-// ===== Student Routes =====
-app.get('/students', async (req, res) => {
+
+// ========= Routes =========
+
+// GET all students
+app.get('/apis/students', async (req, res) => {
     try {
         const students = await Student.find();
         res.json(students);
@@ -62,72 +79,76 @@ app.get('/students', async (req, res) => {
     }
 });
 
-app.post('/students', async (req, res) => {
-    const {
-        student_id,
-        rfid_code,
-        first_name,
-        middle_name,
-        last_name,
-        year_level,
-        school_year,
-        suffix,
-        program,
-        photo,
-        semester,
-        email
-    } = req.body;
 
-    if (!student_id || !semester || !rfid_code || !last_name || !first_name || !year_level || !school_year || !program) {
-        return res.status(400).json({ message: "Please fill in all required fields." });
+// POST new student
+app.post('/apis/students', async (req, res) => {
+    const data = req.body;
+
+    // Manual validation
+    if (!STUDENT_ID_REGEX.test(data.student_id)) {
+        return res.status(400).json({ message: "Invalid student_id format. Use 12-A-12345" });
     }
 
-    try {
-        const full_name = first_name + (middle_name ? ' ' + middle_name + ' ' : ' ') + last_name + (suffix ? ` ${suffix}` : '');
-        const student = new Student({
-            student_id,
-            rfid_code,
-            full_name,
-            first_name,
-            middle_name,
-            last_name,
-            year_level,
-            school_year,
-            suffix,
-            program,
-            photo,
-            semester,
-            email
-        });
+    if (!NAME_REGEX.test(data.first_name) || !NAME_REGEX.test(data.last_name)) {
+        return res.status(400).json({ message: "Names must contain letters only" });
+    }
 
-        const newStudent = await student.save();
-        res.status(201).json(newStudent);
+    const full_name = `${data.first_name} ${data.middle_name || ""} ${data.last_name} ${data.suffix || ""}`.trim();
+
+    try {
+        const student = new Student({ ...data, full_name });
+        const saved = await student.save();
+        res.status(201).json(saved);
     } catch (err) {
         if (err.code === 11000) {
-            return res.status(400).json({ message: "Student ID or RFID code already registered." });
+            return res.status(400).json({ message: "Duplicate student_id or rfid_code" });
         }
         res.status(400).json({ message: err.message });
     }
 });
 
-app.put('/students/:id', async (req, res) => {
+
+// PUT update student
+app.put('/apis/students/:id', async (req, res) => {
     try {
-        const updated = await Student.findByIdAndUpdate(req.params.rfid_code, req.body, { new: true, runValidators: true });
-        if (!updated) return res.status(404).json({ message: "Student not found." });
+        const updates = req.body;
+
+        // If name fields included → validate
+        if (updates.first_name && !NAME_REGEX.test(updates.first_name))
+            return res.status(400).json({ message: "Invalid first_name" });
+
+        if (updates.last_name && !NAME_REGEX.test(updates.last_name))
+            return res.status(400).json({ message: "Invalid last_name" });
+
+        if (updates.student_id && !STUDENT_ID_REGEX.test(updates.student_id))
+            return res.status(400).json({ message: "Invalid student_id format. Use 12-A-12345" });
+
+        const updated = await Student.findByIdAndUpdate(
+            req.params.id,
+            updates,
+            { new: true, runValidators: true }
+        );
+
+        if (!updated) return res.status(404).json({ message: "Student not found" });
+
         res.json(updated);
+
     } catch (err) {
-        if (err.code === 11000) {
-            return res.status(400).json({ message: "Duplicate student_id or rfid_code after update." });
-        }
+        if (err.code === 11000)
+            return res.status(400).json({ message: "Duplicate student_id or rfid_code" });
+
         res.status(400).json({ message: err.message });
     }
 });
 
-app.delete('/students/:id', async (req, res) => {
+
+// DELETE student
+app.delete('/apis/students/:id', async (req, res) => {
     try {
-        const deleted = await Student.findByIdAndDelete(req.params.rfid_code);
-        if (!deleted) return res.status(404).json({ message: "Student not found." });
-        res.json({ message: "Student deleted successfully." });
+        const deleted = await Student.findByIdAndDelete(req.params.id);
+        if (!deleted) return res.status(404).json({ message: "Student not found" });
+
+        res.json({ message: "Student deleted successfully" });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
