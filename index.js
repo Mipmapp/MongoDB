@@ -143,12 +143,16 @@ app.put('/apis/students/:id', async (req, res) => {
 
 
 // DELETE student
-app.delete('/apis/students/:id', async (req, res) => {
+app.delete('/apis/students/:student_id', async (req, res) => {
     try {
-        const deleted = await Student.findByIdAndDelete(req.params.id);
-        if (!deleted) return res.status(404).json({ message: "Student not found" });
+        const deleted = await Student.findOneAndDelete({ student_id: req.params.student_id });
 
-        res.json({ message: "Student deleted successfully" });
+        if (!deleted) {
+            return res.status(404).json({ message: "Student not found." });
+        }
+
+        res.json({ message: "Student deleted successfully." });
+
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
