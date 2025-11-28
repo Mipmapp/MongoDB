@@ -109,22 +109,32 @@ app.post('/apis/students', async (req, res) => {
 
 
 // PUT update student
-app.put('/apis/students/:id', async (req, res) => {
+app.put('/apis/students/:student_id', async (req, res) => {
     try {
         const updates = req.body;
 
-        // If name fields included → validate
+        // Validate names
         if (updates.first_name && !NAME_REGEX.test(updates.first_name))
             return res.status(400).json({ message: "Invalid first_name" });
 
         if (updates.last_name && !NAME_REGEX.test(updates.last_name))
             return res.status(400).json({ message: "Invalid last_name" });
 
+        // Validate student ID format
         if (updates.student_id && !STUDENT_ID_REGEX.test(updates.student_id))
             return res.status(400).json({ message: "Invalid student_id format. Use 12-A-12345" });
 
-        const updated = await Student.findByIdAndUpdate(
-            req.params.id,
+        // Auto-update full_name if names change
+        if (updates.first_name || updates.middle_name || updates.last_name || updates.suffix) {
+            const first = updates.first_name || "";
+            const mid = updates.middle_name || "";
+            const last = updates.last_name || "";
+            const suf = updates.suffix || "";
+            updates.full_name = `${first} ${mid} ${last} ${suf}`.replace(/\s+/g, " ").trim();
+        }
+
+        const updated = await Student.findOneAndUpdate(
+            { student_id: req.params.student_id }, // find by student_id
             updates,
             { new: true, runValidators: true }
         );
@@ -140,6 +150,7 @@ app.put('/apis/students/:id', async (req, res) => {
         res.status(400).json({ message: err.message });
     }
 });
+
 
 
 // DELETE student
