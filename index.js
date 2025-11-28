@@ -37,7 +37,7 @@ const studentSchema = new mongoose.Schema({
         unique: true,
         match: [STUDENT_ID_REGEX, "Invalid student_id format. Required: 12-A-12345"]
     },
-    rfid_code: { type: String, required: true, unique: true },
+    rfid_code: { type: String, required: true }, // no longer unique
     full_name: { type: String },
     first_name: { 
         type: String, 
@@ -101,7 +101,7 @@ app.post('/apis/students', async (req, res) => {
         res.status(201).json(saved);
     } catch (err) {
         if (err.code === 11000) {
-            return res.status(400).json({ message: "Duplicate student_id or rfid_code" });
+            return res.status(400).json({ message: "Duplicate student_id" });
         }
         res.status(400).json({ message: err.message });
     }
@@ -109,12 +109,11 @@ app.post('/apis/students', async (req, res) => {
 
 
 // PUT update student
-// PUT update student
 app.put('/apis/students/:student_id', async (req, res) => {
     try {
         const updates = { ...req.body };
 
-        // Trim all name fields
+        // Trim name fields
         updates.first_name = updates.first_name?.trim();
         updates.middle_name = updates.middle_name?.trim();
         updates.last_name = updates.last_name?.trim();
@@ -123,7 +122,6 @@ app.put('/apis/students/:student_id', async (req, res) => {
         // Validate names
         if (updates.first_name && !NAME_REGEX.test(updates.first_name))
             return res.status(400).json({ message: "Invalid first_name" });
-
         if (updates.last_name && !NAME_REGEX.test(updates.last_name))
             return res.status(400).json({ message: "Invalid last_name" });
 
@@ -131,7 +129,7 @@ app.put('/apis/students/:student_id', async (req, res) => {
         if (updates.student_id && !STUDENT_ID_REGEX.test(updates.student_id))
             return res.status(400).json({ message: "Invalid student_id format. Use 12-A-12345" });
 
-        // Auto-update full_name if names changed
+        // Auto-update full_name
         if (updates.first_name || updates.middle_name || updates.last_name || updates.suffix) {
             const first = updates.first_name || "";
             const mid = updates.middle_name || "";
@@ -140,20 +138,6 @@ app.put('/apis/students/:student_id', async (req, res) => {
             updates.full_name = `${first} ${mid} ${last} ${suf}`.replace(/\s+/g, " ").trim();
         }
 
-        // Special handling for "N/A" RFID
-        if (updates.rfid_code === "N/A") {
-            delete updates.rfid_code;
-            const updated = await Student.findOneAndUpdate(
-                { student_id: req.params.student_id },
-                { ...updates, rfid_code: "N/A" }, // add "N/A" back manually
-                { new: true, runValidators: true }
-            );
-
-            if (!updated) return res.status(404).json({ message: "Student not found" });
-            return res.json(updated);
-        }
-
-        // Normal update for other RFID values
         const updated = await Student.findOneAndUpdate(
             { student_id: req.params.student_id },
             updates,
@@ -166,11 +150,12 @@ app.put('/apis/students/:student_id', async (req, res) => {
 
     } catch (err) {
         if (err.code === 11000) {
-            return res.status(400).json({ message: "Duplicate student_id or rfid_code" });
+            return res.status(400).json({ message: "Duplicate student_id" });
         }
         res.status(400).json({ message: err.message });
     }
 });
+
 
 // DELETE student
 app.delete('/apis/students/:student_id', async (req, res) => {
