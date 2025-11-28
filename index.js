@@ -109,9 +109,16 @@ app.post('/apis/students', async (req, res) => {
 
 
 // PUT update student
+// PUT update student
 app.put('/apis/students/:student_id', async (req, res) => {
     try {
-        const updates = req.body;
+        const updates = { ...req.body };
+
+        // Trim all name fields
+        updates.first_name = updates.first_name?.trim();
+        updates.middle_name = updates.middle_name?.trim();
+        updates.last_name = updates.last_name?.trim();
+        updates.suffix = updates.suffix?.trim();
 
         // Validate names
         if (updates.first_name && !NAME_REGEX.test(updates.first_name))
@@ -124,7 +131,7 @@ app.put('/apis/students/:student_id', async (req, res) => {
         if (updates.student_id && !STUDENT_ID_REGEX.test(updates.student_id))
             return res.status(400).json({ message: "Invalid student_id format. Use 12-A-12345" });
 
-        // Auto-update full_name if names change
+        // Auto-update full_name if names changed
         if (updates.first_name || updates.middle_name || updates.last_name || updates.suffix) {
             const first = updates.first_name || "";
             const mid = updates.middle_name || "";
@@ -133,8 +140,22 @@ app.put('/apis/students/:student_id', async (req, res) => {
             updates.full_name = `${first} ${mid} ${last} ${suf}`.replace(/\s+/g, " ").trim();
         }
 
+        // Special handling for "N/A" RFID
+        if (updates.rfid_code === "N/A") {
+            delete updates.rfid_code;
+            const updated = await Student.findOneAndUpdate(
+                { student_id: req.params.student_id },
+                { ...updates, rfid_code: "N/A" }, // add "N/A" back manually
+                { new: true, runValidators: true }
+            );
+
+            if (!updated) return res.status(404).json({ message: "Student not found" });
+            return res.json(updated);
+        }
+
+        // Normal update for other RFID values
         const updated = await Student.findOneAndUpdate(
-            { student_id: req.params.student_id }, // find by student_id
+            { student_id: req.params.student_id },
             updates,
             { new: true, runValidators: true }
         );
@@ -144,14 +165,12 @@ app.put('/apis/students/:student_id', async (req, res) => {
         res.json(updated);
 
     } catch (err) {
-        if (err.code === 11000)
+        if (err.code === 11000) {
             return res.status(400).json({ message: "Duplicate student_id or rfid_code" });
-
+        }
         res.status(400).json({ message: err.message });
     }
 });
-
-
 
 // DELETE student
 app.delete('/apis/students/:student_id', async (req, res) => {
