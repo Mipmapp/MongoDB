@@ -112,7 +112,7 @@ app.put('/apis/students/:student_id', async (req, res) => {
     try {
         const updates = { ...req.body };
 
-        // Prevent student_id update
+        // Prevent updating student_id
         delete updates.student_id;
 
         // Trim name fields
@@ -139,7 +139,11 @@ app.put('/apis/students/:student_id', async (req, res) => {
         const updated = await Student.findOneAndUpdate(
             { student_id: req.params.student_id },
             updates,
-            { new: true, runValidators: true }
+            { 
+                new: true, 
+                runValidators: true,
+                validateModifiedOnly: true   // 🔥 FIXES duplicate student_id error
+            }
         );
 
         if (!updated) return res.status(404).json({ message: "Student not found" });
