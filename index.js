@@ -13,7 +13,7 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI;
-const JWT_SECRET = process.env.JWT_SECRET || "your_jwt_secret_key";
+const JWT_SECRET = process.env.JWT_SECRET || "SSAAMRegJRMSU";
 
 // ========== MONGO CONNECTION ==========
 mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 5000 })
@@ -100,13 +100,22 @@ function auth(req, res, next) {
     }
 }
 
+function studentAuth(req, res, next) {
+    const token = req.headers.authorization?.split(" ")[1];
+
+    if (!token || token !== process.env.STUDENT_API_KEY) {
+        return res.status(401).json({ message: "Unauthorized: Invalid key" });
+    }
+
+    next();
+}
 
 // =============================================================================
 //                                 STUDENT ROUTES (Protected)
 // =============================================================================
 
 // GET all students (Protected)
-app.get('/apis/students', auth, async (req, res) => {
+app.get('/apis/students', studentAuth, async (req, res) => {
     try {
         const students = await Student.find();
         res.json(students);
@@ -116,7 +125,7 @@ app.get('/apis/students', auth, async (req, res) => {
 });
 
 // POST new student (Protected)
-app.post('/apis/students', auth, async (req, res) => {
+app.post('/apis/students', studentAuth, async (req, res) => {
     const data = req.body;
 
     if (!STUDENT_ID_REGEX.test(data.student_id))
@@ -143,7 +152,7 @@ app.post('/apis/students', auth, async (req, res) => {
 });
 
 // UPDATE student (Protected)
-app.put('/apis/students/:student_id', auth, async (req, res) => {
+app.put('/apis/students/:student_id', studentAuth, async (req, res) => {
     try {
         const updates = { ...req.body };
         delete updates.student_id;
@@ -181,7 +190,7 @@ app.put('/apis/students/:student_id', auth, async (req, res) => {
 });
 
 // DELETE student (Protected)
-app.delete('/apis/students/:student_id', auth, async (req, res) => {
+app.delete('/apis/students/:student_id', studentAuth, async (req, res) => {
     try {
         const deleted = await Student.findOneAndDelete({ student_id: req.params.student_id });
 
