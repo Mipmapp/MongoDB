@@ -2,6 +2,8 @@ import express from 'express';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import cors from 'cors';
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
 
 const app = express();
 dotenv.config();
@@ -11,7 +13,9 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI;
+const JWT_SECRET = process.env.JWT_SECRET || "your_jwt_secret_key";
 
+// ========= MONGO CONNECTION =========
 mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 5000 })
 .then(() => {
     console.log('Connected to MongoDB Atlas');
@@ -67,7 +71,42 @@ const studentSchema = new mongoose.Schema({
 const Student = mongoose.model("Student", studentSchema);
 
 
-// ========= Routes =========
+// ========= MASTER (ADMIN) Schema =========
+const masterSchema = new mongoose.Schema({
+    username: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+    created_at: { type: Date, default: Date.now }
+});
+
+// Remove password when returning JSON
+masterSchema.methods.toJSON = function () {
+    const obj = this.toObject();
+    delete obj.password;
+    return obj;
+};
+
+const Master = mongoose.model("Master", masterSchema);
+
+
+// ========= AUTH MIDDLEWARE =========
+function auth(req, res, next) {
+    const token = req.headers.authorization?.split(" ")[1];
+
+    if (!token) return res.status(401).json({ message: "Access denied. No token provided." });
+
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        req.master = decoded;
+        next();
+    } catch {
+        res.status(400).json({ message: "Invalid token." });
+    }
+}
+
+
+// ===================================================================================
+//                                STUDENT ROUTES
+// ===================================================================================
 
 // GET all students
 app.get('/apis/students', async (req, res) => {
@@ -78,7 +117,6 @@ app.get('/apis/students', async (req, res) => {
         res.status(500).json({ message: err.message });
     }
 });
-
 
 // POST new student
 app.post('/apis/students', async (req, res) => {
@@ -111,19 +149,17 @@ app.post('/apis/students', async (req, res) => {
 app.put('/apis/students/:student_id', async (req, res) => {
     try {
         const updates = { ...req.body };
-
-        // Prevent updating student_id
         delete updates.student_id;
 
         // Trim name fields
         updates.first_name = updates.first_name?.trim();
         updates.middle_name = updates.middle_name?.trim();
         updates.last_name = updates.last_name?.trim();
-        updates.suffix = updates.suffix?.trim();
 
         // Validate names
         if (updates.first_name && !NAME_REGEX.test(updates.first_name))
             return res.status(400).json({ message: "Invalid first_name" });
+
         if (updates.last_name && !NAME_REGEX.test(updates.last_name))
             return res.status(400).json({ message: "Invalid last_name" });
 
@@ -139,11 +175,7 @@ app.put('/apis/students/:student_id', async (req, res) => {
         const updated = await Student.findOneAndUpdate(
             { student_id: req.params.student_id },
             updates,
-            { 
-                new: true, 
-                runValidators: true,
-                validateModifiedOnly: true   // 🔥 FIXES duplicate student_id error
-            }
+            { new: true, runValidators: true, validateModifiedOnly: true }
         );
 
         if (!updated) return res.status(404).json({ message: "Student not found" });
@@ -152,7 +184,7 @@ app.put('/apis/students/:student_id', async (req, res) => {
 
     } catch (err) {
         if (err.code === 11000) {
-            return res.status(400).json({ message: "Duplicate student_id" });
+            return res.status(400).json({ message: "Duplicate value" });
         }
         res.status(400).json({ message: err.message });
     }
@@ -169,6 +201,78 @@ app.delete('/apis/students/:student_id', async (req, res) => {
 
         res.json({ message: "Student deleted successfully." });
 
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+
+// ===================================================================================
+//                                MASTER ADMIN ROUTES
+// ===================================================================================
+
+// CREATE ADMIN
+app.post('/apis/masters', async (req, res) => {
+    try {
+        const { username, password } = req.body;
+
+        if (!username || !password) {
+            return res.status(400).json({ message: "Username and password required" });
+        }
+
+        const existing = await Master.findOne({ username });
+        if (existing) return res.status(400).json({ message: "Username already exists" });
+
+        const hashedPassword = await bcrypt.hash(password, 12);
+
+        const master = await Master.create({
+            username,
+            password: hashedPassword
+        });
+
+        res.status(201).json({
+            message: "Admin created successfully",
+            master
+        });
+
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// LOGIN ADMIN
+app.post("/apis/masters/login", async (req, res) => {
+    try {
+        const { username, password } = req.body;
+
+        const master = await Master.findOne({ username });
+        if (!master) return res.status(400).json({ message: "Invalid username or password" });
+
+        const validPassword = await bcrypt.compare(password, master.password);
+        if (!validPassword) return res.status(400).json({ message: "Invalid username or password" });
+
+        const token = jwt.sign(
+            { id: master._id, username: master.username },
+            JWT_SECRET,
+            { expiresIn: "7d" }
+        );
+
+        res.json({
+            message: "Login successful",
+            token,
+            master
+        });
+
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// GET all admins (protected route)
+app.get('/apis/masters', auth, async (req, res) => {
+    try {
+        const masters = await Master.find();
+        res.json(masters);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
