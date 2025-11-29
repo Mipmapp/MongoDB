@@ -13,7 +13,7 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI;
-const JWT_SECRET = process.env.JWT_SECRET || "SSAAMRegJRMSU";
+const SSAAM_API_KEY = process.env.JWT_SECRET || "SECRET_iKALAT_PALANG_NIMO";
 
 // ========== MONGO CONNECTION ==========
 mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 5000 })
@@ -92,19 +92,19 @@ function auth(req, res, next) {
         return res.status(401).json({ message: "Access denied. No token provided." });
 
     try {
-        const decoded = jwt.verify(token, JWT_SECRET);
+        const decoded = jwt.verify(token, SSAAM_API_KEY);
         req.master = decoded;
         next();
     } catch {
-        res.status(400).json({ message: "Invalid token." });
+        res.status(400).json({ message: "invalid token." });
     }
 }
 
 function studentAuth(req, res, next) {
     const token = req.headers.authorization?.split(" ")[1];
 
-    if (!token || token !== process.env.STUDENT_API_KEY) {
-        return res.status(401).json({ message: "Unauthorized: Invalid key" });
+    if (!token || token !== process.env.SSAAM_STUDENT_API_KEY) {
+        return res.status(401).json({ message: "Unauthorized: Invalid key"});
     }
 
     next();
