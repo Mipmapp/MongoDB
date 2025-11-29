@@ -28,7 +28,6 @@ mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 5000 })
 const STUDENT_ID_REGEX = /^[0-9]{2}-[A-Z]-[0-9]{5}$/;
 const NAME_REGEX = /^[A-Za-z ]+$/;
 
-
 // ========== Student Schema ==========
 const studentSchema = new mongoose.Schema({
     student_id: {
@@ -82,7 +81,6 @@ masterSchema.methods.toJSON = function () {
 };
 
 const Master = mongoose.model("Master", masterSchema);
-
 
 // ========== AUTH MIDDLEWARE ==========
 function auth(req, res, next) {
@@ -252,7 +250,7 @@ app.post("/apis/masters/login", async (req, res) => {
 
         const token = jwt.sign(
             { id: master._id, username: master.username },
-            JWT_SECRET,
+            SSAAM_API_KEY,
             { expiresIn: "7d" }
         );
 
