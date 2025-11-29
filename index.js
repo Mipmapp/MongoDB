@@ -15,7 +15,7 @@ const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI;
 const JWT_SECRET = process.env.JWT_SECRET || "your_jwt_secret_key";
 
-// ========= MONGO CONNECTION =========
+// ========== MONGO CONNECTION ==========
 mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 5000 })
 .then(() => {
     console.log('Connected to MongoDB Atlas');
@@ -24,39 +24,35 @@ mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 5000 })
 .catch(err => console.error('MongoDB error:', err));
 
 
-// ========= VALIDATION REGEX =========
-
-// Student ID format: 12-A-12345
+// ========== VALIDATION REGEX ==========
 const STUDENT_ID_REGEX = /^[0-9]{2}-[A-Z]-[0-9]{5}$/;
-
-// Names must contain letters + spaces only
 const NAME_REGEX = /^[A-Za-z ]+$/;
 
 
-// ========= Student Schema =========
+// ========== Student Schema ==========
 const studentSchema = new mongoose.Schema({
-    student_id: { 
-        type: String, 
-        required: true, 
+    student_id: {
+        type: String,
+        required: true,
         unique: true,
         match: [STUDENT_ID_REGEX, "Invalid student_id format. Required: 12-A-12345"]
     },
-    rfid_code: { type: String, required: true }, // no longer unique
+    rfid_code: { type: String, required: true },
     full_name: { type: String },
-    first_name: { 
-        type: String, 
+    first_name: {
+        type: String,
         required: true,
-        match: [NAME_REGEX, "First name must contain letters only"] 
+        match: [NAME_REGEX, "First name must contain letters only"]
     },
-    middle_name: { 
+    middle_name: {
         type: String,
         match: [NAME_REGEX, "Middle name must contain letters only"],
         default: ""
     },
-    last_name: { 
-        type: String, 
+    last_name: {
+        type: String,
         required: true,
-        match: [NAME_REGEX, "Last name must contain letters only"] 
+        match: [NAME_REGEX, "Last name must contain letters only"]
     },
     suffix: { type: String },
     year_level: { type: String, required: true },
@@ -71,14 +67,14 @@ const studentSchema = new mongoose.Schema({
 const Student = mongoose.model("Student", studentSchema);
 
 
-// ========= MASTER (ADMIN) Schema =========
+// ========== MASTER ADMIN Schema ==========
 const masterSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true },
     password: { type: String, required: true },
     created_at: { type: Date, default: Date.now }
 });
 
-// Remove password when returning JSON
+// Remove password
 masterSchema.methods.toJSON = function () {
     const obj = this.toObject();
     delete obj.password;
@@ -88,11 +84,12 @@ masterSchema.methods.toJSON = function () {
 const Master = mongoose.model("Master", masterSchema);
 
 
-// ========= AUTH MIDDLEWARE =========
+// ========== AUTH MIDDLEWARE ==========
 function auth(req, res, next) {
     const token = req.headers.authorization?.split(" ")[1];
 
-    if (!token) return res.status(401).json({ message: "Access denied. No token provided." });
+    if (!token)
+        return res.status(401).json({ message: "Access denied. No token provided." });
 
     try {
         const decoded = jwt.verify(token, JWT_SECRET);
@@ -104,12 +101,12 @@ function auth(req, res, next) {
 }
 
 
-// ===================================================================================
-//                                STUDENT ROUTES
-// ===================================================================================
+// =============================================================================
+//                                 STUDENT ROUTES (Protected)
+// =============================================================================
 
-// GET all students
-app.get('/apis/students', async (req, res) => {
+// GET all students (Protected)
+app.get('/apis/students', auth, async (req, res) => {
     try {
         const students = await Student.find();
         res.json(students);
@@ -118,58 +115,55 @@ app.get('/apis/students', async (req, res) => {
     }
 });
 
-// POST new student
-app.post('/apis/students', async (req, res) => {
+// POST new student (Protected)
+app.post('/apis/students', auth, async (req, res) => {
     const data = req.body;
 
-    // Manual validation
-    if (!STUDENT_ID_REGEX.test(data.student_id)) {
+    if (!STUDENT_ID_REGEX.test(data.student_id))
         return res.status(400).json({ message: "Invalid student_id format. Use 12-A-12345" });
-    }
 
-    if (!NAME_REGEX.test(data.first_name) || !NAME_REGEX.test(data.last_name)) {
+    if (!NAME_REGEX.test(data.first_name) || !NAME_REGEX.test(data.last_name))
         return res.status(400).json({ message: "Names must contain letters only" });
-    }
 
-    const full_name = `${data.first_name} ${data.middle_name || ""} ${data.last_name} ${data.suffix || ""}`.trim();
+    const full_name =
+        `${data.first_name} ${data.middle_name || ""} ${data.last_name} ${data.suffix || ""}`
+            .replace(/\s+/g, " ")
+            .trim();
 
     try {
         const student = new Student({ ...data, full_name });
         const saved = await student.save();
         res.status(201).json(saved);
     } catch (err) {
-        if (err.code === 11000) {
+        if (err.code === 11000)
             return res.status(400).json({ message: "Duplicate student_id" });
-        }
+
         res.status(400).json({ message: err.message });
     }
 });
 
-// PUT update student
-app.put('/apis/students/:student_id', async (req, res) => {
+// UPDATE student (Protected)
+app.put('/apis/students/:student_id', auth, async (req, res) => {
     try {
         const updates = { ...req.body };
         delete updates.student_id;
 
-        // Trim name fields
         updates.first_name = updates.first_name?.trim();
         updates.middle_name = updates.middle_name?.trim();
         updates.last_name = updates.last_name?.trim();
 
-        // Validate names
         if (updates.first_name && !NAME_REGEX.test(updates.first_name))
             return res.status(400).json({ message: "Invalid first_name" });
 
         if (updates.last_name && !NAME_REGEX.test(updates.last_name))
             return res.status(400).json({ message: "Invalid last_name" });
 
-        // Auto-update full_name
         if (updates.first_name || updates.middle_name || updates.last_name || updates.suffix) {
             const first = updates.first_name || "";
             const mid = updates.middle_name || "";
             const last = updates.last_name || "";
             const suf = updates.suffix || "";
-            updates.full_name = `${first} ${mid} ${last} ${suf}`.replace(/\s+/g, " ").trim();
+            updates.full_name = `${first} ${mid} ${last} ${suf}`.trim();
         }
 
         const updated = await Student.findOneAndUpdate(
@@ -181,47 +175,41 @@ app.put('/apis/students/:student_id', async (req, res) => {
         if (!updated) return res.status(404).json({ message: "Student not found" });
 
         res.json(updated);
-
     } catch (err) {
-        if (err.code === 11000) {
-            return res.status(400).json({ message: "Duplicate value" });
-        }
         res.status(400).json({ message: err.message });
     }
 });
 
-// DELETE student
-app.delete('/apis/students/:student_id', async (req, res) => {
+// DELETE student (Protected)
+app.delete('/apis/students/:student_id', auth, async (req, res) => {
     try {
         const deleted = await Student.findOneAndDelete({ student_id: req.params.student_id });
 
-        if (!deleted) {
+        if (!deleted)
             return res.status(404).json({ message: "Student not found." });
-        }
 
         res.json({ message: "Student deleted successfully." });
-
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
 });
 
 
-// ===================================================================================
-//                                MASTER ADMIN ROUTES
-// ===================================================================================
+// =============================================================================
+//                               MASTER ADMIN ROUTES (Public)
+// =============================================================================
 
 // CREATE ADMIN
 app.post('/apis/masters', async (req, res) => {
     try {
         const { username, password } = req.body;
 
-        if (!username || !password) {
+        if (!username || !password)
             return res.status(400).json({ message: "Username and password required" });
-        }
 
         const existing = await Master.findOne({ username });
-        if (existing) return res.status(400).json({ message: "Username already exists" });
+        if (existing)
+            return res.status(400).json({ message: "Username already exists" });
 
         const hashedPassword = await bcrypt.hash(password, 12);
 
@@ -246,10 +234,12 @@ app.post("/apis/masters/login", async (req, res) => {
         const { username, password } = req.body;
 
         const master = await Master.findOne({ username });
-        if (!master) return res.status(400).json({ message: "Invalid username or password" });
+        if (!master)
+            return res.status(400).json({ message: "Invalid username or password" });
 
-        const validPassword = await bcrypt.compare(password, master.password);
-        if (!validPassword) return res.status(400).json({ message: "Invalid username or password" });
+        const valid = await bcrypt.compare(password, master.password);
+        if (!valid)
+            return res.status(400).json({ message: "Invalid username or password" });
 
         const token = jwt.sign(
             { id: master._id, username: master.username },
@@ -268,7 +258,8 @@ app.post("/apis/masters/login", async (req, res) => {
     }
 });
 
-// GET all admins (protected route)
+
+// GET all admins (Protected)
 app.get('/apis/masters', auth, async (req, res) => {
     try {
         const masters = await Master.find();
