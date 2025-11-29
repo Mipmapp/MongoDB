@@ -26,7 +26,7 @@ mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 5000 })
 
 // ========== VALIDATION REGEX ==========
 const STUDENT_ID_REGEX = /^[0-9]{2}-[A-Z]-[0-9]{5}$/;
-const NAME_REGEX = /^[A-Za-z ]+$/;
+const NAME_REGEX = /^[\p{L}\s'-]+$/u;
 
 // ========== Student Schema ==========
 const studentSchema = new mongoose.Schema({
@@ -112,11 +112,32 @@ function studentAuth(req, res, next) {
 //                                 STUDENT ROUTES (Protected)
 // =============================================================================
 
-// GET all students (Protected)
+// GET all students with PAGINATION (Protected)
 app.get('/apis/students', studentAuth, async (req, res) => {
     try {
-        const students = await Student.find();
-        res.json(students);
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+
+        const students = await Student.find()
+            .skip(skip)
+            .limit(limit)
+            .sort({ created_date: -1 });
+
+        const total = await Student.countDocuments();
+        const totalPages = Math.ceil(total / limit);
+
+        res.json({
+            data: students,
+            pagination: {
+                currentPage: page,
+                limit,
+                total,
+                totalPages,
+                hasNextPage: page < totalPages,
+                hasPrevPage: page > 1
+            }
+        });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -196,6 +217,37 @@ app.delete('/apis/students/:student_id', studentAuth, async (req, res) => {
             return res.status(404).json({ message: "Student not found." });
 
         res.json({ message: "Student deleted successfully." });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+
+// =============================================================================
+//                               STUDENT LOGIN ROUTE (NEW - POST INSTEAD OF GET)
+// =============================================================================
+
+// POST Student Login - Returns matching student data (no GET)
+app.post('/apis/students/login', studentAuth, async (req, res) => {
+    try {
+        const { student_id, last_name } = req.body;
+
+        if (!student_id || !last_name)
+            return res.status(400).json({ message: "Student ID and Last Name required" });
+
+        const student = await Student.findOne({ 
+            student_id,
+            last_name: { $regex: `^${last_name}$`, $options: 'i' }
+        });
+
+        if (!student)
+            return res.status(400).json({ message: "Invalid Student ID or Last Name" });
+
+        res.json({
+            message: "Login successful",
+            student
+        });
+
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
