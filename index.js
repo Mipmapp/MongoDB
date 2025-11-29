@@ -37,7 +37,7 @@ const studentSchema = new mongoose.Schema({
         unique: true,
         match: [STUDENT_ID_REGEX, "Invalid student_id format. Required: 12-A-12345"]
     },
-    rfid_code: { type: String, required: true },
+    rfid_code: { type: String, default: "N/A" },
     full_name: { type: String },
     first_name: {
         type: String,
